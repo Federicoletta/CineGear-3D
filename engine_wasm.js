@@ -81,8 +81,6 @@ function createPath(char, scale, offsetX, offsetY, data) {
           cpy = outline[i++] * scale + offsetY;
           cpx1 = outline[i++] * scale + offsetX;
           cpy1 = outline[i++] * scale + offsetY;
-          cpx2 = outline[i++] * scale + offsetX;
-          cpy2 = outline[i++] * scale + offsetY;
           path.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, cpx, cpy);
           break;
       }
@@ -297,6 +295,47 @@ export function makeLobedCore(wasm, H, d_pocket, d_flat, n_lobes, d_lip, h_lip) 
 }
 
 // 4. CIRCULAR TEXT CUTTER
+function signedArea(pts) {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    a += (pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1]);
+  }
+  return a * 0.5;
+}
+
+function cleanContour(pts, isHole = false) {
+  if (!pts || pts.length < 3) return null;
+  const cleaned = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (cleaned.length === 0) {
+      cleaned.push([p[0], p[1]]);
+    } else {
+      const last = cleaned[cleaned.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 1e-4) {
+        cleaned.push([p[0], p[1]]);
+      }
+    }
+  }
+  if (cleaned.length >= 3) {
+    const p0 = cleaned[0], pEnd = cleaned[cleaned.length - 1];
+    if (Math.hypot(p0[0] - pEnd[0], p0[1] - pEnd[1]) < 1e-4) {
+      cleaned.pop();
+    }
+  }
+  if (cleaned.length < 3) return null;
+
+  const area = signedArea(cleaned);
+  if (Math.abs(area) < 1e-4) return null;
+
+  if (!isHole && area < 0) {
+    cleaned.reverse();
+  } else if (isHole && area > 0) {
+    cleaned.reverse();
+  }
+  return cleaned;
+}
+
 export function buildCircularTextCutter(wasm, font, text, R_text = 33.8, target_h = 3.5, depth = 0.5, Z_top = 10.0, center_angle_deg = 45.0) {
   if (!text || !text.trim() || !font) return null;
   text = text.trim();
@@ -345,12 +384,15 @@ export function buildCircularTextCutter(wasm, font, text, R_text = 33.8, target_
       if (shapes && shapes.length > 0) {
         const charContours = [];
         for (const sh of shapes) {
-          const outer = sh.getPoints(10).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
-          charContours.push(outer);
+          const rawOuter = sh.getPoints(10).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
+          const outer = cleanContour(rawOuter, false);
+          if (outer) charContours.push(outer);
+
           if (sh.holes && sh.holes.length > 0) {
             for (const hole of sh.holes) {
-              const holePts = hole.getPoints(8).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
-              charContours.push(holePts);
+              const rawHole = hole.getPoints(8).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
+              const cleanedHole = cleanContour(rawHole, true);
+              if (cleanedHole) charContours.push(cleanedHole);
             }
           }
         }
@@ -366,10 +408,12 @@ export function buildCircularTextCutter(wasm, font, text, R_text = 33.8, target_
 
           charSolid = charSolid.rotate([0, 0, rotDeg]).translate([tx, ty, tz]);
 
-          if (!combinedCutters) {
-            combinedCutters = charSolid;
-          } else {
-            combinedCutters = combinedCutters.add(charSolid);
+          if (charSolid && charSolid.numTri() > 0) {
+            if (!combinedCutters) {
+              combinedCutters = charSolid;
+            } else {
+              combinedCutters = combinedCutters.add(charSolid);
+            }
           }
         }
       }
@@ -434,8 +478,11 @@ export async function generateCineGearWasm(params) {
     const center_angle = parseFloat(params.text_angle) || 45.0;
 
     const cutter = buildCircularTextCutter(wasm, font, text, R_text, target_h, depth, H, center_angle);
-    if (cutter) {
-      finalGear = finalGear.subtract(cutter);
+    if (cutter && cutter.numTri() > 0) {
+      const testDiff = finalGear.subtract(cutter);
+      if (testDiff && testDiff.numTri() > 0) {
+        finalGear = testDiff;
+      }
     }
   }
 
