@@ -4,11 +4,99 @@
 let wasmInstance = null;
 let defaultFont = null;
 
+// Standalone Typeface JSON Font parser (Three.js compatible)
+class Font {
+  constructor(data) {
+    this.type = 'Font';
+    this.data = data;
+  }
+  generateShapes(text, size = 100) {
+    const shapes = [];
+    const paths = createPaths(text, size, this.data);
+    for (let p = 0; p < paths.length; p++) {
+      Array.prototype.push.apply(shapes, paths[p].toShapes());
+    }
+    return shapes;
+  }
+}
+
+function createPaths(text, size, data) {
+  const chars = Array.from(text);
+  const scale = size / data.resolution;
+  const line_height = (data.boundingBox.yMax - data.boundingBox.yMin + data.underlineThickness) * scale;
+  const paths = [];
+  let offsetX = 0, offsetY = 0;
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    if (char === '\n') {
+      offsetX = 0;
+      offsetY -= line_height;
+    } else {
+      const ret = createPath(char, scale, offsetX, offsetY, data);
+      if (ret) {
+        offsetX += ret.offsetX;
+        paths.push(ret.path);
+      }
+    }
+  }
+  return paths;
+}
+
+function createPath(char, scale, offsetX, offsetY, data) {
+  const glyph = data.glyphs[char] || data.glyphs['?'];
+  if (!glyph) return null;
+  const ShapePathClass = (typeof THREE !== 'undefined' && THREE.ShapePath) 
+    ? THREE.ShapePath 
+    : (typeof window !== 'undefined' && window.THREE && window.THREE.ShapePath)
+      ? window.THREE.ShapePath 
+      : null;
+  if (!ShapePathClass) return null;
+
+  const path = new ShapePathClass();
+  let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2;
+  if (glyph.o) {
+    const outline = glyph._cachedOutline || (glyph._cachedOutline = glyph.o.split(' '));
+    for (let i = 0, l = outline.length; i < l;) {
+      const action = outline[i++];
+      switch (action) {
+        case 'm':
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale + offsetY;
+          path.moveTo(x, y);
+          break;
+        case 'l':
+          x = outline[i++] * scale + offsetX;
+          y = outline[i++] * scale + offsetY;
+          path.lineTo(x, y);
+          break;
+        case 'q':
+          cpx = outline[i++] * scale + offsetX;
+          cpy = outline[i++] * scale + offsetY;
+          cpx1 = outline[i++] * scale + offsetX;
+          cpy1 = outline[i++] * scale + offsetY;
+          path.quadraticCurveTo(cpx1, cpy1, cpx, cpy);
+          break;
+        case 'b':
+          cpx = outline[i++] * scale + offsetX;
+          cpy = outline[i++] * scale + offsetY;
+          cpx1 = outline[i++] * scale + offsetX;
+          cpy1 = outline[i++] * scale + offsetY;
+          cpx2 = outline[i++] * scale + offsetX;
+          cpy2 = outline[i++] * scale + offsetY;
+          path.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, cpx, cpy);
+          break;
+      }
+    }
+  }
+  return { offsetX: glyph.ha * scale, path: path };
+}
+
 export async function initWasmEngine() {
   if (wasmInstance) return wasmInstance;
+  const wasmUrl = new URL('./wasm/manifold.wasm', import.meta.url).href;
   const manifoldModule = (await import('./wasm/manifold.js')).default;
   wasmInstance = await manifoldModule({
-    locateFile: () => './wasm/manifold.wasm'
+    locateFile: () => wasmUrl
   });
   wasmInstance.setup();
   return wasmInstance;
@@ -16,10 +104,16 @@ export async function initWasmEngine() {
 
 export async function loadDefaultFont() {
   if (defaultFont) return defaultFont;
-  const resp = await fetch('./font.json');
-  const json = await resp.json();
-  defaultFont = new THREE.Font(json);
-  return defaultFont;
+  try {
+    const fontUrl = new URL('./font.json', import.meta.url).href;
+    const resp = await fetch(fontUrl);
+    const json = await resp.json();
+    defaultFont = new Font(json);
+    return defaultFont;
+  } catch (err) {
+    console.warn("Could not load font.json, proceeding without text:", err);
+    return null;
+  }
 }
 
 // 1. INVOLUTE GEAR PROFILE (0.8 MOD)
@@ -207,83 +301,86 @@ export function buildCircularTextCutter(wasm, font, text, R_text = 33.8, target_
   if (!text || !text.trim() || !font) return null;
   text = text.trim();
 
-  const charShapes = [];
-  const charWidths = [];
+  try {
+    const charShapes = [];
+    const charWidths = [];
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === ' ') {
-      charShapes.push(null);
-      charWidths.push(target_h * 0.4);
-      continue;
-    }
-    const shapes = font.generateShapes(c, target_h);
-    charShapes.push(shapes);
-    // Measure bbox
-    let minX = Infinity, maxX = -Infinity;
-    for (const sh of shapes) {
-      const pts = sh.getPoints();
-      for (const p of pts) {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === ' ') {
+        charShapes.push(null);
+        charWidths.push(target_h * 0.4);
+        continue;
       }
-    }
-    const cw = (maxX > minX) ? (maxX - minX) : target_h * 0.5;
-    charWidths.push(cw);
-  }
-
-  const spacing = target_h * 0.18;
-  const total_arc_len = charWidths.reduce((a, b) => a + b, 0) + (text.length - 1) * spacing;
-  const total_angle = total_arc_len / Math.max(R_text, 1.0);
-
-  const center_ang = (center_angle_deg * Math.PI) / 180.0;
-  const start_angle = center_ang + total_angle / 2.0;
-  let curr_angle = start_angle;
-
-  let combinedCutters = null;
-
-  for (let i = 0; i < text.length; i++) {
-    const w = charWidths[i];
-    const half_ang = (w / 2.0) / R_text;
-    const ang = curr_angle - half_ang;
-    const shapes = charShapes[i];
-
-    if (shapes && shapes.length > 0) {
-      const charContours = [];
+      const shapes = font.generateShapes(c, target_h);
+      charShapes.push(shapes);
+      let minX = Infinity, maxX = -Infinity;
       for (const sh of shapes) {
-        const outer = sh.getPoints(10).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
-        charContours.push(outer);
-        if (sh.holes && sh.holes.length > 0) {
-          for (const hole of sh.holes) {
-            const holePts = hole.getPoints(8).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
-            charContours.push(holePts);
+        const pts = sh.getPoints();
+        for (const p of pts) {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+        }
+      }
+      const cw = (maxX > minX) ? (maxX - minX) : target_h * 0.5;
+      charWidths.push(cw);
+    }
+
+    const spacing = target_h * 0.18;
+    const total_arc_len = charWidths.reduce((a, b) => a + b, 0) + (text.length - 1) * spacing;
+    const total_angle = total_arc_len / Math.max(R_text, 1.0);
+
+    const center_ang = (center_angle_deg * Math.PI) / 180.0;
+    const start_angle = center_ang + total_angle / 2.0;
+    let curr_angle = start_angle;
+
+    let combinedCutters = null;
+
+    for (let i = 0; i < text.length; i++) {
+      const w = charWidths[i];
+      const half_ang = (w / 2.0) / R_text;
+      const ang = curr_angle - half_ang;
+      const shapes = charShapes[i];
+
+      if (shapes && shapes.length > 0) {
+        const charContours = [];
+        for (const sh of shapes) {
+          const outer = sh.getPoints(10).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
+          charContours.push(outer);
+          if (sh.holes && sh.holes.length > 0) {
+            for (const hole of sh.holes) {
+              const holePts = hole.getPoints(8).map(p => [p.x - w / 2.0, p.y - target_h / 2.0]);
+              charContours.push(holePts);
+            }
+          }
+        }
+
+        if (charContours.length > 0) {
+          const cs = new wasm.CrossSection(charContours, wasm.fillrule.EvenOdd);
+          let charSolid = wasm.Manifold.extrude(cs, depth + 0.3);
+
+          const rotDeg = ((ang - Math.PI / 2.0) * 180.0) / Math.PI;
+          const tx = R_text * Math.cos(ang);
+          const ty = R_text * Math.sin(ang);
+          const tz = Z_top - depth;
+
+          charSolid = charSolid.rotate([0, 0, rotDeg]).translate([tx, ty, tz]);
+
+          if (!combinedCutters) {
+            combinedCutters = charSolid;
+          } else {
+            combinedCutters = combinedCutters.add(charSolid);
           }
         }
       }
-
-      if (charContours.length > 0) {
-        const cs = new wasm.CrossSection(charContours, wasm.fillrule.EvenOdd);
-        let charSolid = wasm.Manifold.extrude(cs, depth + 0.3);
-
-        // Rotate to tangent angle and translate to circle arc position
-        const rotDeg = ((ang - Math.PI / 2.0) * 180.0) / Math.PI;
-        const tx = R_text * Math.cos(ang);
-        const ty = R_text * Math.sin(ang);
-        const tz = Z_top - depth;
-
-        charSolid = charSolid.rotate([0, 0, rotDeg]).translate([tx, ty, tz]);
-
-        if (!combinedCutters) {
-          combinedCutters = charSolid;
-        } else {
-          combinedCutters = combinedCutters.add(charSolid);
-        }
-      }
+      curr_angle -= (w + spacing) / R_text;
     }
-    curr_angle -= (w + spacing) / R_text;
-  }
 
-  return combinedCutters;
+    return combinedCutters;
+  } catch (e) {
+    console.warn("Could not generate text cutter:", e);
+    return null;
+  }
 }
 
 // 5. MASTER GENERATOR
@@ -328,7 +425,7 @@ export async function generateCineGearWasm(params) {
 
   // Text Engraving
   const text = (params.text || '').trim();
-  if (text) {
+  if (text && font) {
     const target_h = parseFloat(params.text_height) || 3.5;
     const depth = parseFloat(params.text_depth) || 0.5;
     const Rp = (m * Z) / 2.0;
