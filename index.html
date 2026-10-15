@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineGear 3D Generator — Follow Focus 0.8 MOD</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  </head>
+<body>
+  <div class="app-container">
+    <!-- SIDEBAR CONTROLLI -->
+    <aside class="sidebar">
+      <div class="header">
+        <div class="logo-box">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>CineGear 3D</h1>
+          <p class="subtitle">Parametric 0.8 MOD Studio</p>
+        </div>
+      </div>
+
+      <!-- PRESET RAPIDI -->
+      <section class="section">
+        <label class="section-label">Preset Obiettivi</label>
+        <select id="presetSelect" class="input-select">
+          <option value="">Caricamento preset...</option>
+        </select>
+        <div id="presetDesc" class="preset-info"></div>
+      </section>
+
+      <!-- TIPO MONTAGGIO INTERNO -->
+      <section class="section">
+        <label class="section-label">Profilo Interno di Montaggio</label>
+        <div class="tabs-mount">
+          <button type="button" class="tab-btn active" data-type="lobed">
+            <span class="tab-icon">✿</span>
+            <span>A Lobi Vintage</span>
+          </button>
+          <button type="button" class="tab-btn" data-type="ribbed">
+            <span class="tab-icon">≡</span>
+            <span>Zigrinato</span>
+          </button>
+          <button type="button" class="tab-btn" data-type="smooth">
+            <span class="tab-icon">◯</span>
+            <span>Liscio</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- PARAMETRI INTERNI DINAMICI -->
+      <section class="section" id="internalParamsSection">
+        <label class="section-label">Misure Calibro Interno (mm)</label>
+
+        <!-- Selettore Standard Spessore / Altezza Battuta -->
+        <div class="input-group">
+          <label>Spessore Battuta di Arresto (Standard)</label>
+          <select id="select_lip_thickness" class="input-select">
+            <option value="1.40">1.40 mm — Vintage Mir-1B</option>
+            <option value="1.00">1.00 mm — Standard Bilanciato</option>
+            <option value="0.80">0.80 mm — Slim (es. diaframma Helios 44-2)</option>
+            <option value="1.20">1.20 mm — Medio</option>
+            <option value="1.50">1.50 mm — Rinforzato</option>
+            <option value="2.00">2.00 mm — Battuta Larga</option>
+            <option value="0.00">0.00 mm — Passante (senza battuta)</option>
+            <option value="custom">✏️ Personalizzato...</option>
+          </select>
+        </div>
+
+        <!-- Campi per LOBED -->
+        <div id="mountLobedFields" class="mount-fields">
+          <div class="input-group">
+            <label>N° Lobi (Standard Obiettivi)</label>
+            <select id="select_lobes" class="input-select">
+              <option value="12">12 Lobi — Standard Soviet (Mir-1B)</option>
+              <option value="10">10 Lobi — Standard Zeiss Jena / Flektogon</option>
+              <option value="8">8 Lobi — Lobi larghi</option>
+              <option value="16">16 Lobi — Lobi fitti</option>
+              <option value="custom">✏️ Personalizzato...</option>
+            </select>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>N° Lobi Effettivi</label>
+              <input type="number" id="n_lobes" value="12" min="3" max="36" step="1">
+            </div>
+            <div class="input-group">
+              <label>Altezza Battuta (mm)</label>
+              <input type="number" id="h_lip_lobed" value="1.40" step="0.10">
+            </div>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Tasca (mm)</label>
+              <input type="number" id="d_pocket" value="59.10" step="0.05">
+            </div>
+            <div class="input-group">
+              <label>Ø Piatto (mm)</label>
+              <input type="number" id="d_flat" value="57.80" step="0.05">
+            </div>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Battuta (mm)</label>
+              <input type="number" id="d_lip_lobed" value="56.00" step="0.05">
+            </div>
+          </div>
+        </div>
+
+        <!-- Campi per RIBBED -->
+        <div id="mountRibbedFields" class="mount-fields hidden">
+          <div class="input-group">
+            <label>N° Scanalature (Standard)</label>
+            <select id="select_ribs" class="input-select">
+              <option value="160">160 scanalature — Soviet (Helios 44-2 / Mir-1B)</option>
+              <option value="120">120 scanalature — Passo medio</option>
+              <option value="180">180 scanalature — Passo ultra-fine</option>
+              <option value="custom">✏️ Personalizzato...</option>
+            </select>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>N° Scanalature</label>
+              <input type="number" id="n_ribs" value="160" min="20" max="300" step="1">
+            </div>
+            <div class="input-group">
+              <label>Altezza Battuta (mm)</label>
+              <input type="number" id="h_lip_ribbed" value="0.80" step="0.10">
+            </div>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Cresta Dente (mm)</label>
+              <input type="number" id="d_tip" value="57.20" step="0.05">
+            </div>
+            <div class="input-group">
+              <label>Ø Gola Fondo (mm)</label>
+              <input type="number" id="d_root" value="58.16" step="0.05">
+            </div>
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Battuta (mm)</label>
+              <input type="number" id="d_lip_ribbed" value="56.50" step="0.05">
+            </div>
+          </div>
+        </div>
+
+        <!-- Campi per SMOOTH -->
+        <div id="mountSmoothFields" class="mount-fields hidden">
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Interno (mm)</label>
+              <input type="number" id="d_inner" value="58.00" step="0.05">
+            </div>
+            <div class="input-group">
+              <label>Altezza Battuta (mm)</label>
+              <input type="number" id="h_lip_smooth" value="1.20" step="0.10">
+            </div>
+          </div>
+          <div class="input-row">
+            <div class="input-group">
+              <label>Ø Battuta (mm)</label>
+              <input type="number" id="d_lip_smooth" value="56.00" step="0.05">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PARAMETRI CORPO GHIERA (CON STANDARD A TENDINA) -->
+      <section class="section">
+        <label class="section-label">Dimensioni Ghiera Esterna</label>
+        
+        <!-- 1. Diametro Standard Cine -->
+        <div class="input-group">
+          <label>Diametro Standard Cine / N° Denti (0.8 MOD)</label>
+          <select id="select_diameter" class="input-select">
+            <option value="80.0">Ø 80.0 mm — 100 Denti (Standard Cine Universale)</option>
+            <option value="75.2">Ø 75.2 mm — 94 Denti (Compatto)</option>
+            <option value="84.8">Ø 84.8 mm — 106 Denti (Medio)</option>
+            <option value="89.6">Ø 89.6 mm — 112 Denti (Lenti Grandi)</option>
+            <option value="95.2">Ø 95.2 mm — 119 Denti (Cine Pro)</option>
+            <option value="113.6">Ø 113.6 mm — 142 Denti (Matte Box 114mm)</option>
+            <option value="custom">✏️ Personalizzato (inserisci Ø o N° Denti)...</option>
+          </select>
+        </div>
+
+        <!-- 2. Spessore Parete Radiale -->
+        <div class="input-group">
+          <label>Spessore Parete Radiale Anello (Standard)</label>
+          <select id="select_wall" class="input-select">
+            <option value="auto">Auto (in base al Diametro Cine)</option>
+            <option value="3.0">3.0 mm — Slim / Compatto</option>
+            <option value="4.0">4.0 mm — Standard Bilanciato (Consigliato)</option>
+            <option value="5.0">5.0 mm — Robusto / Stampa Rigida</option>
+            <option value="6.0">6.0 mm — Heavy Duty</option>
+            <option value="custom">✏️ Personalizzato...</option>
+          </select>
+        </div>
+
+        <div class="input-row">
+          <div class="input-group">
+            <label>Spessore Parete (mm)</label>
+            <input type="number" id="wall_thickness" value="9.4" step="0.2" min="1.5" max="30.0" title="Spessore radiale materiale sotto i denti">
+          </div>
+          <div class="input-group">
+            <label>Ø Primitivo (mm)</label>
+            <input type="number" id="pitch_diameter" value="80.0" step="0.8" min="30.0" max="200.0" title="Diametro primitivo modificabile">
+          </div>
+        </div>
+
+        <div class="input-row">
+          <div class="input-group">
+            <label>N° Denti (Z)</label>
+            <input type="number" id="gear_teeth" value="100" min="40" max="250" step="1" title="Numero denti">
+          </div>
+          <div class="input-group">
+            <label>Ø Esterno Totale</label>
+            <input type="text" id="outer_diameter_calc" value="81.6 mm" readonly class="input-readonly">
+          </div>
+        </div>
+
+        <!-- 3. Altezza Ghiera H -->
+        <div class="input-group">
+          <label>Altezza Ghiera H (Standard)</label>
+          <select id="select_height" class="input-select">
+            <option value="10.5">10.5 mm — Messa a fuoco standard (Mir-1B)</option>
+            <option value="4.5">4.5 mm — Diaframma slim (Helios 44-2)</option>
+            <option value="6.0">6.0 mm — Diaframma standard (Mir-1B)</option>
+            <option value="8.0">8.0 mm — Messa a fuoco compatta</option>
+            <option value="12.0">12.0 mm — Larga / Teleobiettivi</option>
+            <option value="custom">✏️ Personalizzata (scrivi sotto)...</option>
+          </select>
+        </div>
+
+        <div class="input-row">
+          <div class="input-group">
+            <label>Altezza H (mm)</label>
+            <input type="number" id="gear_height" value="10.50" step="0.25" min="3.0" max="30.0">
+          </div>
+          <div class="input-group">
+            <label>Smusso Bordi (mm)</label>
+            <input type="number" id="gear_chamfer" value="0.60" step="0.05" min="0.0" max="1.5">
+          </div>
+        </div>
+
+        <!-- 4. Smusso Bordi Dropdown -->
+        <div class="input-group">
+          <label>Profilo Smusso Bordi (Standard)</label>
+          <select id="select_chamfer" class="input-select">
+            <option value="0.60">0.60 mm — Smusso netto anti-graffio</option>
+            <option value="0.50">0.50 mm — Medio bilanciato</option>
+            <option value="0.45">0.45 mm — Leggero (Helios)</option>
+            <option value="0.00">0.00 mm — Nessuno (Spigolo vivo)</option>
+            <option value="custom">✏️ Personalizzato...</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- INCISIONE TESTO -->
+      <section class="section">
+        <div class="section-header-inline">
+          <label class="section-label">Incisione Curva Frontale</label>
+          <label class="switch">
+            <input type="checkbox" id="enableText" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div id="textFieldsGroup">
+          <div class="input-group">
+            <label>Testo Inciso (es. MIR-1B, HELIOS 44-2)</label>
+            <input type="text" id="engrave_text" value="MIR-1B" placeholder="Testo ghiera">
+          </div>
+
+          <div class="input-row">
+            <div class="input-group">
+              <label>Altezza Testo (mm)</label>
+              <input type="number" id="text_height" value="3.5" step="0.1" min="1.5" max="6.0">
+            </div>
+            <div class="input-group">
+              <label>Profondità Scavo (mm)</label>
+              <input type="number" id="text_depth" value="0.60" step="0.05" min="0.1" max="1.5">
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Profondità Scavo (Standard Layer)</label>
+            <select id="select_depth" class="input-select">
+              <option value="0.60">0.60 mm (5 layer @ 0.12mm - Consigliato Bambu Lab)</option>
+              <option value="0.48">0.48 mm (4 layer @ 0.12mm)</option>
+              <option value="0.40">0.40 mm (2 layer @ 0.20mm standard)</option>
+              <option value="0.80">0.80 mm (Extra profondo)</option>
+              <option value="custom">✏️ Personalizzata...</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- SALVATAGGIO / AZIONI -->
+      <section class="section export-section">
+        <div class="input-group">
+          <label>Nome File STL</label>
+          <input type="text" id="export_filename" value="Mir-1B Focus Gear 0.8MOD.stl">
+        </div>
+        
+        <div class="actions-group">
+          <button type="button" id="btnPreview" class="btn btn-secondary">
+            <span class="btn-icon">🔄</span> Aggiorna Vista 3D
+          </button>
+          <button type="button" id="btnExport" class="btn btn-primary">
+            <span class="btn-icon">🚀</span> Scarica File STL
+          </button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- AREA VIEWPORT 3D -->
+    <main class="viewport-area">
+      <div id="canvasContainer"></div>
+
+      <!-- OVERLAY STATISTICHE -->
+      <div class="hud-overlay" id="hudOverlay">
+        <div class="hud-card">
+          <div class="hud-title">Specifiche Modello</div>
+          <div class="hud-grid">
+            <div class="hud-item">
+              <span class="hud-label">Geometria:</span>
+              <span class="hud-val highlight-green" id="hudWatertight">100% Watertight (Manifold)</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Spessore Parete:</span>
+              <span class="hud-val highlight-green" id="hudWall">9.4 mm (Ottimo)</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Triangoli:</span>
+              <span class="hud-val" id="hudFaces">12,512</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Dimensioni Esterne:</span>
+              <span class="hud-val" id="hudDims">Ø 81.6 × 10.5 mm</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Tempo di Calcolo:</span>
+              <span class="hud-val" id="hudTime">0.20 s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTROLLI DELLA VISTA -->
+      <div class="view-controls">
+        <button class="view-btn" id="btnViewIso" title="Vista Isometrica">ISO</button>
+        <button class="view-btn" id="btnViewTop" title="Vista Superiore">TOP</button>
+        <button class="view-btn" id="btnViewSide" title="Vista Laterale">SIDE</button>
+        <button class="view-btn" id="btnViewCut" title="Vista Fondo (Bore)">BOTTOM</button>
+        <span class="divider-v"></span>
+        <button class="view-btn" id="btnToggleTurntable" title="Auto-Rotazione">⟳ Turn</button>
+        <button class="view-btn" id="btnToggleWire" title="Mostra Wireframe">Wire</button>
+      </div>
+
+      <!-- SPINNER CARICAMENTO -->
+      <div class="loader-overlay hidden" id="loaderOverlay">
+        <div class="spinner"></div>
+        <div class="loader-text" id="loaderText">Calcolo booleano Manifold in corso...</div>
+      </div>
+
+      <!-- TOAST NOTIFICHE -->
+      <div class="toast hidden" id="toast">
+        <div class="toast-icon">✓</div>
+        <div class="toast-content">
+          <div class="toast-title" id="toastTitle">File Generato con Successo!</div>
+          <div class="toast-desc" id="toastDesc">Scaricato nei Download</div>
+        </div>
+        
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
